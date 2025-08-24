@@ -10,14 +10,12 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy uv configuration
-COPY pyproject.toml uv.lock ./
+# Copy project configuration and source code (needed for build)
+COPY pyproject.toml uv.lock license README.md ./
+COPY metrolinkTimes/ ./metrolinkTimes/
 
 # Install dependencies with uv
 RUN uv sync --frozen --no-dev
-
-# Copy application code
-COPY metrolinkTimes/ ./metrolinkTimes/
 
 # Copy config directory (you can override this with a volume mount)
 COPY config/ ./config/
