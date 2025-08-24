@@ -47,7 +47,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Build Docker image
-      run: docker build -f Dockerfile.fastapi -t metrolink-times:test .
+      run: docker build -f Dockerfile -t metrolink-times:test .
     
     - name: Test Docker image
       run: |
