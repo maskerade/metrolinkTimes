@@ -15,7 +15,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 2. **Clone and setup the project**:
 ```bash
-git clone https://github.com/j616/metrolinkTimes.git
+git clone https://github.com/maskerade/metrolinkTimes.git
 cd metrolinkTimes
 uv sync  # Installs Python 3.12 and all dependencies automatically
 ```

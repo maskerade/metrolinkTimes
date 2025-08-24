@@ -45,10 +45,10 @@ test = [
 metrolink-times = "metrolinkTimes.__main__:main"
 
 [project.urls]
-homepage = "https://github.com/j616/metrolinkTimes"
-repository = "https://github.com/j616/metrolinkTimes"
-documentation = "https://github.com/j616/metrolinkTimes#readme"
-issues = "https://github.com/j616/metrolinkTimes/issues"
+homepage = "https://github.com/maskerade/metrolinkTimes"
+repository = "https://github.com/maskerade/metrolinkTimes"
+documentation = "https://github.com/maskerade/metrolinkTimes#readme"
+issues = "https://github.com/maskerade/metrolinkTimes/issues"
 
 [tool.hatch.version]
 path = "metrolinkTimes/__init__.py"
