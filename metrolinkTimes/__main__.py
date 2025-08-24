@@ -39,7 +39,9 @@ def load_config() -> dict[str, Any]:
                 logger.error(f"Could not parse config file {config_path}: {e}")
                 continue
 
-    logger.warning(f"No config file found. Checked: {', '.join(str(p) for p in config_paths)}")
+    logger.warning(
+        f"No config file found. Checked: {', '.join(str(p) for p in config_paths)}"
+    )
     logger.info("Using default configuration")
     return default_config
 

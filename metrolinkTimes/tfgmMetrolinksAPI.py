@@ -64,7 +64,9 @@ class TFGMMetrolinksAPI:
 
                 retData[sl][ac].append(platform)
 
-            logging.info(f"Successfully processed TfGM data: {len(retData)} stations, {len(data['value'])} platforms")
+            logging.info(
+                f"Successfully processed TfGM data: {len(retData)} stations, {len(data['value'])} platforms"
+            )
             return retData
 
         except Exception as e:

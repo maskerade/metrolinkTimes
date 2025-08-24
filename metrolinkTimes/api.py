@@ -357,7 +357,9 @@ async def health_check():
         await ensure_fresh_data()
         return "ok"
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Service unavailable: {str(e)}") from e
+        raise HTTPException(
+            status_code=503, detail=f"Service unavailable: {str(e)}"
+        ) from e
 
 
 @app.get("/debug/", response_model=DebugInfo)

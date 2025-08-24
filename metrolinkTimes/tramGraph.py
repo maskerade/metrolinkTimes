@@ -20,9 +20,7 @@ class TramGraph:
         self.debounceCount = 2
         self.localUpdateTime = None
 
-        data = json.load(
-            open(f"{os.path.dirname(__file__)}/data/stations.json")
-        )
+        data = json.load(open(f"{os.path.dirname(__file__)}/data/stations.json"))
         self.stations = data.keys()
         for s in data:
             for p in data[s]:
@@ -62,9 +60,7 @@ class TramGraph:
                             inS = thisInS
 
                     self.DG.add_edge(f"{inS}_{inSP}", nodeID)
-                    self.DG.edges[f"{inS}_{inSP}", nodeID][
-                        "transitTimes"
-                    ] = []
+                    self.DG.edges[f"{inS}_{inSP}", nodeID]["transitTimes"] = []
 
                     if data[s][p].get("terminating", False):
                         self.DG.edges[f"{inS}_{inSP}", nodeID]["weight"] = 2
@@ -259,9 +255,7 @@ class TramGraph:
                         )
                 break
         else:
-            logging.warning(
-                f"No matching departed tram for tram arrived at {node}"
-            )
+            logging.warning(f"No matching departed tram for tram arrived at {node}")
             return False
         return True
 
@@ -670,9 +664,7 @@ class TramGraph:
 
             offset = 0
             for delTram in delTrams:
-                logging.warning(
-                    f"Deleting stale tram from {node} departed trams"
-                )
+                logging.warning(f"Deleting stale tram from {node} departed trams")
                 del self.DG.nodes[node]["tramsDeparted"][delTram - offset]
                 offset = offset + 1
 
