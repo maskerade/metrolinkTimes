@@ -1,43 +1,123 @@
 # Metrolink Times
 
-Metrolink Times provides an API that serves estimates for tram arrival times on the Manchester Metrolink network. Estimates use a rolling average for transit times between stops and dwell times at stops to provide reasonably accurate estimates that should addapt to traffic, changes in speed limits, heavy crowds etc.
+Metrolink Times provides a FastAPI-based REST API that serves real-time estimates for tram arrival times on the Manchester Metrolink network. The system uses rolling averages for transit times between stops and dwell times at platforms to provide accurate predictions that adapt to traffic, speed limit changes, and crowding conditions.
 
 ## Installation
 
-### Install from source
+### Installation with uv (Recommended)
 
-The following is used to install install in a venv for testing.
+This project uses [uv](https://docs.astral.sh/uv/) for fast, reliable Python package management.
 
-Install pyenv
+1. **Install uv**:
 ```bash
-curl https://pyenv.run | bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Install Python 3.7
+2. **Clone and setup the project**:
 ```bash
-pyenv install 3.7.7
-```
-After installing, it may suggest to add initialization code to `~/.bashrc`. Do that.
-
-Configure and install the environment used for this project.
-```bash
-pyenv local 3.7.7
-pip3 install .
+git clone https://github.com/j616/metrolinkTimes.git
+cd metrolinkTimes
+uv sync  # Installs Python 3.12 and all dependencies automatically
 ```
 
-During development, you need to have your environment activated. When it is activated, your terminal prompt is prefixed with (.venv).
+3. **Run the application**:
+```bash
+uv run python -m metrolinkTimes
+```
 
-### Install using docker
+### Alternative Installation with pip
 
-A docker image for this package is available on [Docker Hub](https://hub.docker.com/r/j616s/metrolinktimes).
+If you prefer traditional pip installation:
+
+```bash
+# Requires Python 3.12+
+pip install -e .
+python -m metrolinkTimes
+```
+
+### Docker Installation
+
+Build and run with Docker:
+
+```bash
+docker build -t metrolink-times .
+docker run -p 5000:5000 -v $(pwd)/config:/app/config metrolink-times
+```
 
 ### Configure
 
-Copy the [example config](https://github.com/j616/metrolinkTimes/blob/master/config/metrolinkTimes.conf) to `/etc/metrolinkTimes/metrolinkTimes.conf`. OR if you're using docker, mount it at that location in the container. Edit the config to include your API Key for the [TfGM API](https://developer.tfgm.com/) and if you want to change the CORS Access Control Origin settings from allow all. The API **will not work** if you do not add a key for the TfGM API. If you want to change the default port the API is served on from 5000, add a `"port": <portNum>` line to the config.
+The application looks for configuration files in the following order:
+1. `config/metrolinkTimes.conf` (local to project - **recommended**)
+2. `metrolinkTimes.conf` (current directory)
+3. `/etc/metrolinkTimes/metrolinkTimes.conf` (system-wide)
+
+Create a config file with your TfGM API key:
+
+```json
+{
+    "Ocp-Apim-Subscription-Key": "your-tfgm-api-key-here",
+    "Access-Control-Allow-Origin": "*",
+    "port": 5000
+}
+```
+
+Get your API key from the [TfGM API](https://developer.tfgm.com/). The API **will not work** without a valid TfGM API key.
 
 ## Usage
 
-The API will present itself on port on port 5000 by default. If you're installing from source, run metrolinkTimes from the command line in the repo directory. Logs are placed in `/var/log/metrolinkTimes.log` if running locally or are available through `docker logs` in docker.
+The API runs on port 5000 by default and provides automatic interactive documentation.
+
+### Running the Application
+
+```bash
+# Run with uv (recommended)
+uv run python -m metrolinkTimes
+
+# Development with auto-reload
+python dev.py dev
+
+# Or run uvicorn directly
+uv run uvicorn metrolinkTimes.api:app --host 0.0.0.0 --port 5000 --reload
+
+# Run with traditional Python
+python -m metrolinkTimes
+```
+
+### Development Commands
+
+```bash
+# Development server with auto-reload
+python dev.py dev
+
+# Run tests
+python dev.py test
+
+# Lint code
+python dev.py lint
+
+# Format code
+python dev.py format
+```
+
+### Deployment Modes
+
+The application supports two deployment modes:
+
+**Polling Mode (Default - for containers/servers):**
+- Continuously polls TfGM API every second
+- Fast API responses with cached data
+- Set `METROLINK_MODE=polling` or `"polling_enabled": true` in config
+
+**On-Demand Mode (for AWS Lambda/serverless):**
+- Fetches fresh data on each API request
+- No background processes
+- Set `METROLINK_MODE=lambda` or `"polling_enabled": false` in config
+
+### API Documentation
+
+FastAPI provides automatic interactive documentation:
+- **Swagger UI**: http://localhost:5000/docs
+- **ReDoc**: http://localhost:5000/redoc
 
 ### /
 

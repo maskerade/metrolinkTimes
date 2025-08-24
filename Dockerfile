@@ -1,19 +1,32 @@
-FROM python:3.7 as base
+FROM python:3.12-slim
 
-RUN mkdir pkg
-
-COPY pyproject.toml license README.md ./
-COPY metrolinkTimes/*.py metrolinkTimes/
-COPY metrolinkTimes/data/stations.json metrolinkTimes/data/
-
-RUN --mount=type=cache,target=/root/.cache/pip --mount=source=.git,target=.git,type=bind pip wheel --wheel-dir=/wheeley .
-
-FROM python:3.7-slim
-EXPOSE 5000
 WORKDIR /app
 
-COPY --from=base /wheeley /wheeley
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-RUN --mount=type=cache,target=/root/.cache/pip pip3 install --find-links=/wheeley metrolinkTimes
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["python3", "-m", "metrolinkTimes"]
+# Copy uv configuration
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies with uv
+RUN uv sync --frozen --no-dev
+
+# Copy application code
+COPY metrolinkTimes/ ./metrolinkTimes/
+
+# Copy config directory (you can override this with a volume mount)
+COPY config/ ./config/
+
+# Create log directory
+RUN mkdir -p /var/log/metrolinkTimes
+
+# Expose port
+EXPOSE 5000
+
+# Run the FastAPI application with uv
+CMD ["uv", "run", "python", "-m", "metrolinkTimes"]

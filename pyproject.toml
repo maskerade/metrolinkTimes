@@ -1,45 +1,89 @@
 [build-system]
-requires = ["setuptools", "setuptools_scm[toml]>=6.2"]
-build-backend = "setuptools.build_meta"# pyproject.toml
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
-name = "metrolinkTimes"
+name = "metrolink-times"
 description = "Track trams on the metrolink network & estimate their due times"
 readme = "README.md"
 authors = [
-  {email = "metrolinktimes@j616s.co.uke"},
-  {name = "James Sandford"}
+    {name = "James Sandford", email = "metrolinktimes@j616s.co.uk"}
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.12"
 license = {file = "license"}
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
 ]
 dependencies = [
-	"networkx~=2.6",
-	"matplotlib~=3.5.2",
-	"tornado~=6.1.0"
+    "networkx>=3.2",
+    "matplotlib>=3.8.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
+    "ruff>=0.1.0",
+]
 test = [
- 	"pytest-flake8~=1.0.4",
-	"flake8~=3.7.9"
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
 ]
 
 [project.scripts]
-metrolinkTimes = "metrolinkTimes.__main__:main"
+metrolink-times = "metrolinkTimes.__main__:main"
 
 [project.urls]
 homepage = "https://github.com/j616/metrolinkTimes"
 repository = "https://github.com/j616/metrolinkTimes"
+documentation = "https://github.com/j616/metrolinkTimes#readme"
+issues = "https://github.com/j616/metrolinkTimes/issues"
 
-[tool.setuptools_scm]
-write_to = "pkg/_version.py"
+[tool.hatch.version]
+path = "metrolinkTimes/__init__.py"
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["metrolinkTimes"]
 
-[tool.setuptools.package-data]
-metrolinkTimes = ["data/stations.json"]
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by formatter
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+    "B904", # raise from within except
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+asyncio_mode = "auto"

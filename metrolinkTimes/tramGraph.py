@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import json
-import operator
-import networkx as nx
-import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
 import logging
+import operator
 import os
 from copy import deepcopy
+from datetime import datetime, timedelta
+
+import matplotlib.pyplot as plt
+import networkx as nx
 
 
 class TramGraph:
@@ -19,12 +20,13 @@ class TramGraph:
         self.debounceCount = 2
         self.localUpdateTime = None
 
-        data = json.load(open("{}/data/stations.json".format(
-            os.path.dirname(__file__))))
+        data = json.load(
+            open(f"{os.path.dirname(__file__)}/data/stations.json")
+        )
         self.stations = data.keys()
         for s in data:
             for p in data[s]:
-                nodeID = "{}_{}".format(s, p)
+                nodeID = f"{s}_{p}"
                 self.DG.add_node(nodeID)
                 self.DG.nodes[nodeID]["stationName"] = s
                 self.DG.nodes[nodeID]["platformID"] = p
@@ -50,8 +52,7 @@ class TramGraph:
                 self.DG.nodes[nodeID]["predictedArrivals"] = []
                 self.DG.nodes[nodeID]["dwellTimes"] = []
 
-                self.pos[nodeID] = [
-                    data[s][p]["map"]["x"], data[s][p]["map"]["y"]]
+                self.pos[nodeID] = [data[s][p]["map"]["x"], data[s][p]["map"]["y"]]
 
                 for inSP in data[s][p]["stationsBefore"]:
                     inS = None
@@ -60,16 +61,15 @@ class TramGraph:
                         if inSP in data[thisInS]:
                             inS = thisInS
 
-                    self.DG.add_edge("{}_{}".format(inS, inSP), nodeID)
-                    self.DG.edges[
-                        "{}_{}".format(inS, inSP), nodeID]["transitTimes"] = []
+                    self.DG.add_edge(f"{inS}_{inSP}", nodeID)
+                    self.DG.edges[f"{inS}_{inSP}", nodeID][
+                        "transitTimes"
+                    ] = []
 
                     if data[s][p].get("terminating", False):
-                        self.DG.edges[
-                            "{}_{}".format(inS, inSP), nodeID]["weight"] = 2
+                        self.DG.edges[f"{inS}_{inSP}", nodeID]["weight"] = 2
                     else:
-                        self.DG.edges[
-                            "{}_{}".format(inS, inSP), nodeID]["weight"] = 1
+                        self.DG.edges[f"{inS}_{inSP}", nodeID]["weight"] = 1
 
     def updatePlatformPID(self, nodeID, PIDTramData, message, updateTime):
         self.DG.nodes[nodeID]["pidTrams"] = PIDTramData
@@ -82,19 +82,15 @@ class TramGraph:
         self.DG.nodes[node]["tramsArrived"] = []
         self.DG.nodes[node]["tramsApproaching"] = []
         self.DG.nodes[node]["tramsDue"] = []
-        self.DG.nodes[node]["prevTramsHere"] = self.DG.nodes[node][
-            "tramsHere"]
+        self.DG.nodes[node]["prevTramsHere"] = self.DG.nodes[node]["tramsHere"]
         self.DG.nodes[node]["tramsHere"] = []
 
         for tram in self.DG.nodes[node]["pidTrams"]:
-            if tram["dest"] in [
-              "Terminates Here",
-              "See Tram Front",
-              "Not in Service"]:
+            if tram["dest"] in ["Terminates Here", "See Tram Front", "Not in Service"]:
                 continue
 
             status = tram["status"]
-            del(tram["status"])
+            del tram["status"]
             # We'll remove exact duplicates at the same time here
             # Can happen on stops with multiple PIDs or with bugs in the
             # data
@@ -108,16 +104,16 @@ class TramGraph:
                 if tram not in self.DG.nodes[node]["tramsDue"]:
                     self.DG.nodes[node]["tramsDue"].append(tram)
             else:
-                logging.error("Unknown tram status: {}".format(status))
+                logging.error(f"Unknown tram status: {status}")
 
     def calcTramDwell(self, tramsDeparted, node):
         # Calculate dwell times for departed trams
         if tramsDeparted != []:
             for tram in tramsDeparted:
                 if "status" in tram:
-                    del(tram["status"])
+                    del tram["status"]
                 if "wait" in tram:
-                    del(tram["wait"])
+                    del tram["wait"]
                 tram["departTime"] = self.DG.nodes[node]["updateTime"]
 
                 if tram["arriveTime"] is None:
@@ -125,11 +121,11 @@ class TramGraph:
                 else:
                     tram["dwellTime"] = tram["departTime"] - tram["arriveTime"]
                     if tram["dwellTime"] != timedelta():
-                        self.DG.nodes[node]["dwellTimes"].append(
-                            tram["dwellTime"])
+                        self.DG.nodes[node]["dwellTimes"].append(tram["dwellTime"])
                         # Only keep track of 5 most recent dwell times
-                        self.DG.nodes[node]["dwellTimes"] = self.DG.nodes[
-                            node]["dwellTimes"][-5:]
+                        self.DG.nodes[node]["dwellTimes"] = self.DG.nodes[node][
+                            "dwellTimes"
+                        ][-5:]
 
             averageDwell, isDirectAverage = self.getAverageDwell(node)
             for tram in tramsDeparted:
@@ -146,14 +142,14 @@ class TramGraph:
                 if pTram in pTramsMatched:
                     continue
                 # Delta allows for variance between our predictions & TfGM's
-                tramTime = (self.DG.nodes[node]["updateTime"] +
-                            timedelta(minutes=wait))
+                tramTime = self.DG.nodes[node]["updateTime"] + timedelta(minutes=wait)
                 tramDelta = abs(pTram["predictedArriveTime"] - tramTime)
                 if (
-                   (pTram["curLoc"]["platform"] != node)
-                   and (tram["dest"] == pTram["dest"])
-                   and (tram["carriages"] == pTram["carriages"])
-                   and tramDelta < timedelta(minutes=2)):
+                    (pTram["curLoc"]["platform"] != node)
+                    and (tram["dest"] == pTram["dest"])
+                    and (tram["carriages"] == pTram["carriages"])
+                    and tramDelta < timedelta(minutes=2)
+                ):
                     tramStartsHere = False
                     pTramsMatched.append(pTram)
                     break
@@ -164,17 +160,20 @@ class TramGraph:
 
     def locateDeparting(self, node):
         # Locate departing trams
-        tramsAt = self.DG.nodes[node]["tramsDeparting"] + self.DG.nodes[node][
-            "tramsArrived"]
+        tramsAt = (
+            self.DG.nodes[node]["tramsDeparting"] + self.DG.nodes[node]["tramsArrived"]
+        )
         tramsDeparted = []
 
         # Reverse to make sure newer trams matched first
         for prevTramHere in reversed(self.DG.nodes[node]["prevTramsHere"]):
             tramFound = False
             for tram in tramsAt:
-                if ((prevTramHere["dest"] == tram["dest"])
-                   and (prevTramHere["carriages"] == tram["carriages"])
-                   and "matched" not in tram):
+                if (
+                    (prevTramHere["dest"] == tram["dest"])
+                    and (prevTramHere["carriages"] == tram["carriages"])
+                    and "matched" not in tram
+                ):
                     tramFound = True
                     tram["matched"] = True
                     break
@@ -182,20 +181,18 @@ class TramGraph:
                 # if in other platform at this station, copy to there
                 statName = self.DG.nodes[node]["stationName"]
                 platIDs = self.getStationPlatforms(statName)
-                nodeIDs = ["{}_{}".format(statName, p) for p in platIDs]
+                nodeIDs = [f"{statName}_{p}" for p in platIDs]
                 nodeIDs.remove(node)
                 tramFound = False
                 for otherNode in nodeIDs:
                     for state in ["tramsDeparting", "tramsArrived"]:
                         for tram in self.DG.nodes[otherNode][state]:
-                            if ((prevTramHere["dest"] == tram["dest"])
-                               and (prevTramHere["carriages"]
-                                    == tram["carriages"])):
+                            if (prevTramHere["dest"] == tram["dest"]) and (
+                                prevTramHere["carriages"] == tram["carriages"]
+                            ):
                                 tramFound = True
-                                self.DG.nodes[otherNode][state].remove(
-                                    tram)
-                                self.DG.nodes[otherNode][state].append(
-                                    prevTramHere)
+                                self.DG.nodes[otherNode][state].remove(tram)
+                                self.DG.nodes[otherNode][state].append(prevTramHere)
                                 break
                         if tramFound:
                             break
@@ -209,7 +206,7 @@ class TramGraph:
 
         for tram in tramsAt:
             if "matched" in tram:
-                del(tram["matched"])
+                del tram["matched"]
 
         for tram in tramsDeparted:
             destIsNext = False
@@ -225,56 +222,64 @@ class TramGraph:
             foundPTram = None
             for i in range(len(self.DG.nodes[pNode]["tramsDeparted"])):
                 pTram = self.DG.nodes[pNode]["tramsDeparted"][i]
-                if ((pTram["dest"] == tram["dest"])
-                   and (pTram["carriages"] == tram["carriages"])):
+                if (pTram["dest"] == tram["dest"]) and (
+                    pTram["carriages"] == tram["carriages"]
+                ):
                     foundPTram = i
 
                     timeBetweenStops = tram["arriveTime"] - pTram["departTime"]
                     if timeBetweenStops != timedelta():
                         self.DG.edges[pNode, node]["transitTimes"].append(
-                            timeBetweenStops)
-                        self.DG.edges[pNode, node][
-                            "transitTimes"] = self.DG.edges[pNode, node][
-                                "transitTimes"][-5:]
+                            timeBetweenStops
+                        )
+                        self.DG.edges[pNode, node]["transitTimes"] = self.DG.edges[
+                            pNode, node
+                        ]["transitTimes"][-5:]
 
-                        (averageTransitTime,
-                            isDirectAverage) = self.getAverageTransit(
-                            pNode, node)
+                        (averageTransitTime, isDirectAverage) = self.getAverageTransit(
+                            pNode, node
+                        )
 
-                        logging.info("Time between stops {} and {} {}".format(
-                            pNode, node, timeBetweenStops))
                         logging.info(
-                            "Average time between stops {} and {} {}".format(
-                                pNode, node, averageTransitTime))
+                            f"Time between stops {pNode} and {node} {timeBetweenStops}"
+                        )
+                        logging.info(
+                            f"Average time between stops {pNode} and {node} {averageTransitTime}"
+                        )
                     break
 
             if foundPTram is not None:
                 # Delete found tram and any before it. Trams can't overtake so
                 # we'll assume it doesn't actually exist here
-                for i in range(foundPTram+1):
+                for i in range(foundPTram + 1):
                     self.DG.nodes[pNode]["tramsDeparted"].pop(0)
                     if i != foundPTram:
-                        logging.warning("Deleting overtaken tram from {} "
-                                        "departed trams".format(pNode))
+                        logging.warning(
+                            f"Deleting overtaken tram from {pNode} departed trams"
+                        )
                 break
         else:
-            logging.warning("No matching departed tram for tram arrived at "
-                            "{}".format(node))
+            logging.warning(
+                f"No matching departed tram for tram arrived at {node}"
+            )
             return False
         return True
 
     def locateAt(self, node):
         # Locate arriving trams & update "tramsHere" array and transit times
-        tramsAt = self.DG.nodes[node]["tramsDeparting"] + self.DG.nodes[node][
-            "tramsArrived"]
+        tramsAt = (
+            self.DG.nodes[node]["tramsDeparting"] + self.DG.nodes[node]["tramsArrived"]
+        )
         newTramsHere = []
 
         for tram in tramsAt:
             tramFound = False
             for tramHere in self.DG.nodes[node]["prevTramsHere"]:
-                if ((tramHere["dest"] == tram["dest"])
-                   and (tramHere["carriages"] == tram["carriages"])
-                   and ("matched" not in tramHere)):
+                if (
+                    (tramHere["dest"] == tram["dest"])
+                    and (tramHere["carriages"] == tram["carriages"])
+                    and ("matched" not in tramHere)
+                ):
                     tramFound = True
                     newTramsHere.append(tramHere)
                     tramHere["matched"] = True
@@ -292,7 +297,7 @@ class TramGraph:
 
         for tram in newTramsHere:
             if "matched" in tram:
-                del(tram["matched"])
+                del tram["matched"]
 
         self.DG.nodes[node]["tramsHere"] = newTramsHere
 
@@ -317,7 +322,7 @@ class TramGraph:
     def getAverageDwell(self, platform):
         dwellTimes = self.DG.nodes[platform]["dwellTimes"]
         if len(dwellTimes) > 0:
-            return sum(dwellTimes, timedelta())/len(dwellTimes), True
+            return sum(dwellTimes, timedelta()) / len(dwellTimes), True
         else:
             station = self.DG.nodes[platform]["stationName"]
             for node in nx.nodes(self.DG):
@@ -326,17 +331,14 @@ class TramGraph:
                 if self.DG.nodes[node]["stationName"] == station:
                     dwellTimes = self.DG.nodes[node]["dwellTimes"]
                     if len(dwellTimes) > 0:
-                        return (
-                            sum(dwellTimes, timedelta())/len(dwellTimes),
-                            False)
+                        return (sum(dwellTimes, timedelta()) / len(dwellTimes), False)
         return None, False
 
     def getAverageTransit(self, start, end):
-
         def getTransit(_start, _end):
             transitTimes = self.DG.edges[_start, _end]["transitTimes"]
             if len(transitTimes) > 0:
-                return sum(transitTimes, timedelta())/len(transitTimes)
+                return sum(transitTimes, timedelta()) / len(transitTimes)
             else:
                 return None
 
@@ -382,19 +384,22 @@ class TramGraph:
         if len(path) < 2:
             return predictions, True
 
-        if ((self.DG.nodes[start]["stationName"] != "Exchange Square")
-           and (start != "St Peters Square_9400ZZMASTP2")
-           and (self.DG.nodes[end]["stationName"] != "Exchange Square")
-           and (end != "St Peters Square_9400ZZMASTP3")):
+        if (
+            (self.DG.nodes[start]["stationName"] != "Exchange Square")
+            and (start != "St Peters Square_9400ZZMASTP2")
+            and (self.DG.nodes[end]["stationName"] != "Exchange Square")
+            and (end != "St Peters Square_9400ZZMASTP3")
+        ):
             for platform in path:
                 if self.DG.nodes[platform]["stationName"] == "Exchange Square":
-                    if ((self.DG.nodes[start][
-                        "stationName"] == "Market Street")
-                       or (self.DG.nodes[end][
-                            "stationName"] == "Market Street")):
-                        logging.error("When finding shortest path start was {}"
-                                      ", end was {}, and path passed through "
-                                      "Exchange Square".format(start, end))
+                    if (self.DG.nodes[start]["stationName"] == "Market Street") or (
+                        self.DG.nodes[end]["stationName"] == "Market Street"
+                    ):
+                        logging.error(
+                            f"When finding shortest path start was {start}"
+                            f", end was {end}, and path passed through "
+                            "Exchange Square"
+                        )
                         return {}, False
                     destFound = False
                     endStaName = self.DG.nodes[end]["stationName"]
@@ -405,19 +410,22 @@ class TramGraph:
                     if not destFound:
                         marketSt = self.getDestPlatform(start, "Market Street")
                         predicted, cont = self.predictTram(
-                            start, marketSt, startDepartTime)
+                            start, marketSt, startDepartTime
+                        )
                         predictions.update(predicted)
                         if cont:
                             arriveMarketSt = max(predictions.values())
 
-                            averageDwell, isDirectAverage = (
-                                self.getAverageDwell(marketSt))
+                            averageDwell, isDirectAverage = self.getAverageDwell(
+                                marketSt
+                            )
                             if averageDwell is None:
                                 return predictions, False
 
                             leaveMarketSt = arriveMarketSt + averageDwell
                             predicted, cont = self.predictTram(
-                                marketSt, end, leaveMarketSt)
+                                marketSt, end, leaveMarketSt
+                            )
                             predictions.update(predicted)
                         return predictions, cont
 
@@ -427,10 +435,11 @@ class TramGraph:
 
         for platformNum in range(len(path) - 1):
             prevPlat = path[platformNum]
-            curPlat = path[platformNum+1]
+            curPlat = path[platformNum + 1]
 
             (averageTransitTime, isDirectAverage) = self.getAverageTransit(
-                prevPlat, curPlat)
+                prevPlat, curPlat
+            )
             if averageTransitTime is None:
                 return predictions, False
 
@@ -438,8 +447,9 @@ class TramGraph:
 
             # If next stop's predicted arrival is < now, base later "
             # predictions off of now
-            if ((platformNum == 0)
-               and (workingTramTime < self.DG.nodes[curPlat]["updateTime"])):
+            if (platformNum == 0) and (
+                workingTramTime < self.DG.nodes[curPlat]["updateTime"]
+            ):
                 workingTramTime = self.DG.nodes[curPlat]["updateTime"]
             predictions[curPlat] = workingTramTime
 
@@ -456,7 +466,7 @@ class TramGraph:
         destPlatforms = []
 
         for node in nx.nodes(self.DG):
-            if self.DG.nodes[node]['stationName'] == dest:
+            if self.DG.nodes[node]["stationName"] == dest:
                 destPlatforms.append(node)
 
         for platformID in destPlatforms:
@@ -464,8 +474,9 @@ class TramGraph:
                 # TODO: Use function to get weight accounting for terminating "
                 # stop/pass through
                 length = nx.astar_path_length(
-                    self.DG, source=startPlatform, target=platformID)
-                if ((distance is None) or length < distance):
+                    self.DG, source=startPlatform, target=platformID
+                )
+                if (distance is None) or length < distance:
                     closestPlatform = platformID
                     distance = length
             except nx.NetworkXNoPath:
@@ -480,23 +491,26 @@ class TramGraph:
             if tram["via"] is not None:
                 viaPlatform = self.getDestPlatform(startPlatform, tram["via"])
                 predicted, cont = self.predictTram(
-                    startPlatform, viaPlatform, departTime)
+                    startPlatform, viaPlatform, departTime
+                )
                 if cont:
-                    averageDwell, isDirectAverage = self.getAverageDwell(
-                        viaPlatform)
+                    averageDwell, isDirectAverage = self.getAverageDwell(viaPlatform)
                     if averageDwell is None:
                         averageDwell = timedelta()
 
                     departVia = predicted[viaPlatform] + averageDwell
-                    predicted.update(self.predictTram(
-                        viaPlatform, destPlatform, departVia)[0])
+                    predicted.update(
+                        self.predictTram(viaPlatform, destPlatform, departVia)[0]
+                    )
             else:
                 try:
                     predicted = self.predictTram(
-                        startPlatform, destPlatform, departTime)[0]
+                        startPlatform, destPlatform, departTime
+                    )[0]
                 except RecursionError:
-                    logging.error("Max recursion {}, dest: {}".format(
-                        startPlatform, destPlatform))
+                    logging.error(
+                        f"Max recursion {startPlatform}, dest: {destPlatform}"
+                    )
                     return None
 
             return predicted
@@ -508,42 +522,39 @@ class TramGraph:
                     for tram in self.DG.nodes[node]["tramsHere"]:
                         if tram["arriveTime"] is not None:
                             tram["predictions"] = getTramPredictions(
-                                node, tram["arriveTime"] + averageDwell, tram)
+                                node, tram["arriveTime"] + averageDwell, tram
+                            )
 
             if "tramsDeparted" in statuses:
                 for tram in self.DG.nodes[node]["tramsDeparted"]:
                     tram["predictions"] = getTramPredictions(
-                        node, tram["departTime"], tram)
+                        node, tram["departTime"], tram
+                    )
 
             if "tramsApproaching" in statuses:
                 for tram in self.DG.nodes[node]["tramsApproaching"]:
-                    departTime = (self.DG.nodes[node]["updateTime"] +
-                                  timedelta(minutes=tram["wait"]))
-                    tram["predictions"] = getTramPredictions(
-                        node, departTime, tram)
+                    departTime = self.DG.nodes[node]["updateTime"] + timedelta(
+                        minutes=tram["wait"]
+                    )
+                    tram["predictions"] = getTramPredictions(node, departTime, tram)
                     tram["predictions"][node] = departTime
 
     def debounceNewApproaching(self, node):
         newDeb = []
         newAppr = []
 
-        self.DG.nodes[node]["tramsApproaching"].sort(
-            key=lambda x: x["wait"]
-            )
-        self.DG.nodes[node]["tramsApproachingDeb"].sort(
-            key=lambda x: x["wait"]
-            )
+        self.DG.nodes[node]["tramsApproaching"].sort(key=lambda x: x["wait"])
+        self.DG.nodes[node]["tramsApproachingDeb"].sort(key=lambda x: x["wait"])
 
         for tram in self.DG.nodes[node]["tramsApproaching"]:
             found = False
             for dTram in self.DG.nodes[node]["tramsApproachingDeb"]:
                 if (
-                   (tram["dest"] == dTram["dest"])
-                   and (tram["carriages"] == dTram["carriages"])
-                   and (tram["wait"]
-                        <= dTram["wait"])
-                   and (not dTram.get("matched", False))
-                   ):
+                    (tram["dest"] == dTram["dest"])
+                    and (tram["carriages"] == dTram["carriages"])
+                    and (tram["wait"] <= dTram["wait"])
+                    and (not dTram.get("matched", False))
+                ):
                     found = True
                     dTram["matched"] = True
 
@@ -561,8 +572,7 @@ class TramGraph:
 
         for tram in self.DG.nodes[node]["tramsApproachingDeb"]:
             if not tram.get("matched", False):
-                logging.info(
-                    "Dropping debounced tram approaching {}".format(node))
+                logging.info(f"Dropping debounced tram approaching {node}")
 
         self.DG.nodes[node]["tramsApproaching"] = newAppr
         self.DG.nodes[node]["tramsApproachingDeb"] = newDeb
@@ -576,10 +586,10 @@ class TramGraph:
                 found = False
                 for dTram in self.DG.nodes[node]["tramsHereDeb"]:
                     if (
-                       (tram["dest"] == dTram["dest"])
-                       and (tram["carriages"] == dTram["carriages"])
-                       and (not dTram.get("matched", False))
-                       ):
+                        (tram["dest"] == dTram["dest"])
+                        and (tram["carriages"] == dTram["carriages"])
+                        and (not dTram.get("matched", False))
+                    ):
                         found = True
                         dTram["matched"] = True
 
@@ -599,7 +609,7 @@ class TramGraph:
 
         for tram in self.DG.nodes[node]["tramsHereDeb"]:
             if not tram.get("matched", False):
-                logging.info("Dropping debounced tram at {}".format(node))
+                logging.info(f"Dropping debounced tram at {node}")
 
         self.DG.nodes[node]["tramsHere"] = newHere
         self.DG.nodes[node]["tramsHereDeb"] = newDeb
@@ -625,8 +635,8 @@ class TramGraph:
                         continue
                     seenVia = False
                     for plat, time in sorted(
-                       tram["predictions"].items(),
-                       key=operator.itemgetter(1)):
+                        tram["predictions"].items(), key=operator.itemgetter(1)
+                    ):
                         if tram["via"] == self.DG.nodes[plat]["stationName"]:
                             seenVia = True
                         via = tram["via"]
@@ -637,18 +647,14 @@ class TramGraph:
                                 "dest": tram["dest"],
                                 "via": via,
                                 "carriages": tram["carriages"],
-                                "curLoc": {
-                                    "platform": node,
-                                    "status": shortStatus
-                                    },
+                                "curLoc": {"platform": node, "status": shortStatus},
                                 "predictedArriveTime": time,
-                                "predictions": tram["predictions"]
-                                }
+                                "predictions": tram["predictions"],
+                            }
 
                             if "wait" in tram:
                                 predTram["curLoc"]["pidWait"] = tram["wait"]
-                            self.DG.nodes[plat]["predictedArrivals"].append(
-                                predTram)
+                            self.DG.nodes[plat]["predictedArrivals"].append(predTram)
 
     def clearOldDeparted(self):
         # Attempt at fixing ghost trams hanging around in departed lists
@@ -657,27 +663,33 @@ class TramGraph:
             for i in range(len(self.DG.nodes[node]["tramsDeparted"])):
                 tram = self.DG.nodes[node]["tramsDeparted"][i]
                 maxTransit = timedelta(minutes=6)
-                if ((tram["departTime"] + maxTransit)
-                   < self.DG.nodes[node]["updateTime"]):
+                if (tram["departTime"] + maxTransit) < self.DG.nodes[node][
+                    "updateTime"
+                ]:
                     delTrams.append(i)
 
             offset = 0
             for delTram in delTrams:
                 logging.warning(
-                    "Deleting stale tram from {} departed trams".format(node))
-                del(self.DG.nodes[node]["tramsDeparted"][delTram - offset])
+                    f"Deleting stale tram from {node} departed trams"
+                )
+                del self.DG.nodes[node]["tramsDeparted"][delTram - offset]
                 offset = offset + 1
 
     def finalisePredictions(self):
         for node in nx.nodes(self.DG):
             self.DG.nodes[node]["fPredictedArrivals"] = deepcopy(
-                self.DG.nodes[node]["predictedArrivals"])
+                self.DG.nodes[node]["predictedArrivals"]
+            )
             self.DG.nodes[node]["fTramsHere"] = deepcopy(
-                self.DG.nodes[node]["tramsHere"])
+                self.DG.nodes[node]["tramsHere"]
+            )
             self.DG.nodes[node]["fTramsDeparted"] = deepcopy(
-                self.DG.nodes[node]["tramsDeparted"])
+                self.DG.nodes[node]["tramsDeparted"]
+            )
             self.DG.nodes[node]["fTramsApproaching"] = deepcopy(
-                self.DG.nodes[node]["tramsApproaching"])
+                self.DG.nodes[node]["tramsApproaching"]
+            )
 
     def clearNodePredictions(self):
         for node in nx.nodes(self.DG):
@@ -697,7 +709,8 @@ class TramGraph:
 
     def getTramsStarting(self):
         tramsApproachings = deepcopy(
-            nx.get_node_attributes(self.DG, "fTramsApproaching"))
+            nx.get_node_attributes(self.DG, "fTramsApproaching")
+        )
 
         return tramsApproachings
 
@@ -706,7 +719,7 @@ class TramGraph:
         for node in tramsHere:
             for tram in tramsHere[node]:
                 if "wait" in tram:
-                    del(tram["wait"])
+                    del tram["wait"]
         return tramsHere
 
     def getTramsDeparteds(self):
@@ -763,10 +776,11 @@ class TramGraph:
 
 def main():
     graph = TramGraph()
-    plt.figure(3,figsize=(100,12)) 
+    plt.figure(3, figsize=(100, 12))
     # plt.subplot(121)
     nx.draw_networkx(
-        graph.DG, pos=graph.pos, with_labels=True, node_size=20, font_size=6)
+        graph.DG, pos=graph.pos, with_labels=True, node_size=20, font_size=6
+    )
 
     plt.savefig("trams.png")
 
