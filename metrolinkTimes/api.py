@@ -241,7 +241,7 @@ def should_use_polling_mode():
         return True
     elif mode in ["ondemand", "lambda"]:
         return False
-    
+
     # Check config file
     polling_enabled = config.get("polling_enabled", True)
     return polling_enabled
@@ -255,7 +255,7 @@ def load_config():
         "metrolinkTimes.conf",  # Current directory
         "/etc/metrolinkTimes/metrolinkTimes.conf",  # System-wide
     ]
-    
+
     for config_path in config_paths:
         try:
             with open(config_path) as conf_file:
@@ -267,7 +267,7 @@ def load_config():
         except json.JSONDecodeError as e:
             logging.error(f"Invalid JSON in config file {config_path}: {e}")
             continue
-    
+
     logging.warning("No config file found, using defaults")
     return {"Access-Control-Allow-Origin": "*", "port": 5000}
 
@@ -331,20 +331,20 @@ async def root():
 async def ensure_fresh_data():
     """Ensure we have fresh data - either from polling or on-demand fetch"""
     tram_graph, updater = get_graph()
-    
+
     if not should_use_polling_mode():
         # On-demand mode: always fetch fresh data
         logging.info("On-demand mode: fetching fresh data from TfGM API")
         updater.update()
         return
-    
+
     # Polling mode: check if data is fresh
     now = datetime.now()
     lastUpdated = tram_graph.getLocalUpdateTime()
-    
+
     if lastUpdated is None:
         raise HTTPException(status_code=503, detail="Service not yet initialized")
-    
+
     updateDelta = now - lastUpdated
     if updateDelta > timedelta(seconds=30):
         raise HTTPException(status_code=503, detail="Service not updating")

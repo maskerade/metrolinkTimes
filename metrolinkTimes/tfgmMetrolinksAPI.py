@@ -4,7 +4,6 @@ import http.client
 import json
 import logging
 from time import sleep
-import os
 
 
 class TFGMMetrolinksAPI:
@@ -15,9 +14,9 @@ class TFGMMetrolinksAPI:
             "metrolinkTimes.conf",  # Current directory
             "/etc/metrolinkTimes/metrolinkTimes.conf",  # System-wide
         ]
-        
+
         self.conf = {"Ocp-Apim-Subscription-Key": None}
-        
+
         for config_path in config_paths:
             try:
                 with open(config_path) as conf_file:
@@ -47,9 +46,9 @@ class TFGMMetrolinksAPI:
             conn = http.client.HTTPSConnection("api.tfgm.com")
             conn.request("GET", "/odata/Metrolinks", "{body}", headers)
             response = conn.getresponse()
-            
+
             logging.info(f"TfGM API response status: {response.status}")
-            
+
             data = json.loads(response.read().decode("utf-8"))
             conn.close()
 

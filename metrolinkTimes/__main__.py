@@ -20,7 +20,7 @@ def load_config() -> dict[str, Any]:
         Path("metrolinkTimes.conf"),  # Current directory
         Path("/etc/metrolinkTimes/metrolinkTimes.conf"),  # System-wide
     ]
-    
+
     default_config = {
         "port": 5050,
         "host": "0.0.0.0",
