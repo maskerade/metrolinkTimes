@@ -6,6 +6,7 @@ Uses Mangum to adapt FastAPI for Lambda execution.
 import json
 import logging
 import os
+
 import boto3
 from mangum import Mangum
 
@@ -30,23 +31,23 @@ def load_tfgm_api_key():
 def create_lambda_config():
     """Create configuration for Lambda environment"""
     tfgm_api_key = load_tfgm_api_key()
-    
+
     if not tfgm_api_key or tfgm_api_key == 'PLACEHOLDER_VALUE':
         logger.warning("TfGM API key not configured. API will not work properly.")
         tfgm_api_key = None
-    
+
     # Create a temporary config file for the Lambda environment
     config = {
         "Ocp-Apim-Subscription-Key": tfgm_api_key,
         "Access-Control-Allow-Origin": "*",
         "polling_enabled": False  # Force on-demand mode in Lambda
     }
-    
+
     # Write config to /tmp (only writable directory in Lambda)
     config_path = "/tmp/metrolinkTimes.conf"
     with open(config_path, 'w') as f:
         json.dump(config, f)
-    
+
     logger.info(f"Created Lambda config at {config_path}")
     return config_path
 
@@ -54,15 +55,15 @@ def create_lambda_config():
 try:
     # Set up configuration for Lambda
     create_lambda_config()
-    
+
     # Import the FastAPI app
     from metrolinkTimes.api import app
-    
+
     # Create the Mangum handler
     handler = Mangum(app, lifespan="off")
-    
+
     logger.info("Lambda handler initialized successfully")
-    
+
 except Exception as e:
     logger.error(f"Failed to initialize Lambda handler: {e}")
     raise
@@ -70,23 +71,23 @@ except Exception as e:
 def lambda_handler(event, context):
     """
     AWS Lambda entry point.
-    
+
     Args:
         event: API Gateway event
         context: Lambda context
-        
+
     Returns:
         API Gateway response
     """
     try:
         logger.info(f"Processing request: {event.get('httpMethod', 'UNKNOWN')} {event.get('path', 'UNKNOWN')}")
-        
+
         # Use Mangum to handle the request
         response = handler(event, context)
-        
+
         logger.info(f"Request processed successfully: {response.get('statusCode', 'UNKNOWN')}")
         return response
-        
+
     except Exception as e:
         logger.error(f"Error processing request: {e}")
         return {
