@@ -40,7 +40,9 @@ class TFGMMetrolinksAPI:
                 self.conf["Ocp-Apim-Subscription-Key"] = env_api_key
                 logging.info("Using TfGM API key from environment variable")
             else:
-                logging.warning("No TfGM API key found in config or environment variable TFGM_API_KEY")
+                logging.warning(
+                    "No TfGM API key found in config or environment variable TFGM_API_KEY"
+                )
 
     def getData(self):
         if not self.conf.get("Ocp-Apim-Subscription-Key"):
