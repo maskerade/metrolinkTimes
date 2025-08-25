@@ -3,6 +3,7 @@
 import http.client
 import json
 import logging
+import os
 from time import sleep
 
 
@@ -13,6 +14,7 @@ class TFGMMetrolinksAPI:
             "config/metrolinkTimes.conf",  # Local to project
             "metrolinkTimes.conf",  # Current directory
             "/etc/metrolinkTimes/metrolinkTimes.conf",  # System-wide
+            "/tmp/metrolinkTimes.conf",  # Lambda temporary directory
         ]
 
         self.conf = {"Ocp-Apim-Subscription-Key": None}
@@ -30,7 +32,15 @@ class TFGMMetrolinksAPI:
                 continue
         else:
             logging.warning("No config file found. Checked: " + ", ".join(config_paths))
-            logging.warning("API will not work without TfGM API key")
+
+        # Check for API key in environment variable if not found in config
+        if not self.conf.get("Ocp-Apim-Subscription-Key"):
+            env_api_key = os.environ.get("TFGM_API_KEY")
+            if env_api_key:
+                self.conf["Ocp-Apim-Subscription-Key"] = env_api_key
+                logging.info("Using TfGM API key from environment variable")
+            else:
+                logging.warning("No TfGM API key found in config or environment variable TFGM_API_KEY")
 
     def getData(self):
         if not self.conf.get("Ocp-Apim-Subscription-Key"):

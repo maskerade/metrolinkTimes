@@ -254,6 +254,7 @@ def load_config():
         "config/metrolinkTimes.conf",  # Local to project
         "metrolinkTimes.conf",  # Current directory
         "/etc/metrolinkTimes/metrolinkTimes.conf",  # System-wide
+        "/tmp/metrolinkTimes.conf",  # Lambda temporary directory
     ]
 
     for config_path in config_paths:

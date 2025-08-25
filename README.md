@@ -46,12 +46,25 @@ docker run -p 5000:5000 -v $(pwd)/config:/app/config metrolink-times
 
 ### Configure
 
+#### API Key Configuration
+
+Get your API key from the [TfGM API](https://developer.tfgm.com/). The API **will not work** without a valid TfGM API key.
+
+You can configure the TfGM API key in two ways:
+
+**Option 1: Environment Variable (Recommended)**
+Set the `TFGM_API_KEY` environment variable:
+```bash
+export TFGM_API_KEY=your-tfgm-api-key-here
+```
+
+**Option 2: Configuration File**
 The application looks for configuration files in the following order:
-1. `config/metrolinkTimes.conf` (local to project - **recommended**)
+1. `config/metrolinkTimes.conf` (local to project)
 2. `metrolinkTimes.conf` (current directory)
 3. `/etc/metrolinkTimes/metrolinkTimes.conf` (system-wide)
 
-Create a config file with your TfGM API key:
+Create a config file with your settings:
 
 ```json
 {
@@ -61,7 +74,7 @@ Create a config file with your TfGM API key:
 }
 ```
 
-Get your API key from the [TfGM API](https://developer.tfgm.com/). The API **will not work** without a valid TfGM API key.
+**Note:** Environment variables take precedence over config files for the API key.
 
 ## Usage
 

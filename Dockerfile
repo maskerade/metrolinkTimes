@@ -24,7 +24,7 @@ COPY config/ ./config/
 RUN mkdir -p /var/log/metrolinkTimes
 
 # Expose port
-EXPOSE 5000
+EXPOSE 5050
 
-# Run the FastAPI application with uv
+# Default command for container mode (can be overridden for Lambda)
 CMD ["uv", "run", "python", "-m", "metrolinkTimes"]

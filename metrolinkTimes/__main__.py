@@ -19,6 +19,7 @@ def load_config() -> dict[str, Any]:
         Path("config/metrolinkTimes.conf"),  # Local to project
         Path("metrolinkTimes.conf"),  # Current directory
         Path("/etc/metrolinkTimes/metrolinkTimes.conf"),  # System-wide
+        Path("/tmp/metrolinkTimes.conf"),  # Lambda temporary directory
     ]
 
     default_config = {
