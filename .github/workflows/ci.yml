@@ -60,7 +60,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ghcr.io/${{ github.repository }}
+        images: ghcr.io/${{ github.repository_owner }}/metrolink-times
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -79,8 +79,8 @@ jobs:
     - name: Test Docker image
       run: |
         # Pull and test the published image
-        docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
-        docker run -d --name test-container -p 5000:5000 ghcr.io/${{ github.repository }}:${{ github.sha }}
+        docker pull ghcr.io/${{ github.repository_owner }}/metrolink-times:${{ github.sha }}
+        docker run -d --name test-container -p 5000:5000 ghcr.io/${{ github.repository_owner }}/metrolink-times:${{ github.sha }}
         sleep 10
         docker logs test-container
         docker stop test-container
