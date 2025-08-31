@@ -42,18 +42,45 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
+      packages: write
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Build Docker image
-      run: docker build -f Dockerfile -t metrolink-times:test .
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
     
     - name: Test Docker image
       run: |
-        # Start container in background
-        docker run -d --name test-container -p 5000:5000 metrolink-times:test
+        # Pull and test the published image
+        docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+        docker run -d --name test-container -p 5000:5000 ghcr.io/${{ github.repository }}:${{ github.sha }}
         sleep 10
-        # Test if it's responding (will fail without config, but should start)
         docker logs test-container
         docker stop test-container
