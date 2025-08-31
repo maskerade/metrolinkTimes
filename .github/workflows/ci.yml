@@ -78,9 +78,11 @@ jobs:
     
     - name: Test Docker image
       run: |
-        # Pull and test the published image
-        docker pull ghcr.io/${{ github.repository_owner }}/metrolink-times:${{ github.sha }}
-        docker run -d --name test-container -p 5000:5000 ghcr.io/${{ github.repository_owner }}/metrolink-times:${{ github.sha }}
+        # Pull and test the published image using the short SHA tag
+        IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/metrolink-times:${{ github.ref_name }}-$(echo ${{ github.sha }} | cut -c1-7)"
+        echo "Testing image: $IMAGE_TAG"
+        docker pull "$IMAGE_TAG"
+        docker run -d --name test-container -p 5000:5000 "$IMAGE_TAG"
         sleep 10
         docker logs test-container
         docker stop test-container
