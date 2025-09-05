@@ -252,6 +252,10 @@ def get_graph():
 
 def should_use_polling_mode():
     """Check if we should run in polling mode or on-demand mode"""
+    # If TramGraph is not available, we must use on-demand mode
+    if TramGraph is None:
+        return False
+
     # Check environment variable first
     mode = os.getenv("METROLINK_MODE", "").lower()
     if mode in ["polling", "container"]:
@@ -382,6 +386,13 @@ async def health_check():
 @app.get("/debug/", response_model=DebugInfo)
 async def debug_info(meta: bool = Query(False, description="Include station metadata")):
     """Get debug information about the network state"""
+    if not should_use_polling_mode():
+        # Debug endpoint is not available in Lambda mode
+        raise HTTPException(
+            status_code=404,
+            detail="Debug endpoint is only available in polling mode"
+        )
+
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
     here = tram_graph.getTramsHeres()
