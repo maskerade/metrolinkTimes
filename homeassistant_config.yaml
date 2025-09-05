@@ -1,0 +1,201 @@
+# Home Assistant Configuration for Metrolink Times API
+# Add this to your configuration.yaml file
+
+# REST sensors for Metrolink data
+rest:
+  # Station summary sensor (shows total trams at a station)
+  - resource: "http://your-api-host:5050/homeassistant/station/Altrincham/"
+    scan_interval: 30
+    sensor:
+      - name: "Metrolink Altrincham"
+        value_template: "{{ value_json.state }}"
+        unit_of_measurement: "trams"
+        icon: "mdi:train"
+        json_attributes:
+          - station_name
+          - platforms
+          - last_updated
+
+  # Outgoing trams sensor (perfect for the Home Assistant forum example)
+  - resource: "http://your-api-host:5050/homeassistant/station/Altrincham/outgoing/"
+    scan_interval: 30
+    sensor:
+      - name: "Metrolink Altrincham Outgoing"
+        value_template: "{{ value_json.state }}"
+        unit_of_measurement: "trams"
+        icon: "mdi:train-variant"
+        json_attributes:
+          - station_name
+          - direction
+          - last_updated
+          - message
+          - dest0
+          - status0
+          - wait0
+          - carriages0
+          - dest1
+          - status1
+          - wait1
+          - carriages1
+          - dest2
+          - status2
+          - wait2
+          - carriages2
+          - dest3
+          - status3
+          - wait3
+          - carriages3
+
+  # Incoming trams sensor
+  - resource: "http://your-api-host:5050/homeassistant/station/Altrincham/incoming/"
+    scan_interval: 30
+    sensor:
+      - name: "Metrolink Altrincham Incoming"
+        value_template: "{{ value_json.state }}"
+        unit_of_measurement: "trams"
+        icon: "mdi:train-variant"
+        json_attributes:
+          - station_name
+          - direction
+          - last_updated
+          - message
+          - dest0
+          - status0
+          - wait0
+          - carriages0
+          - dest1
+          - status1
+          - wait1
+          - carriages1
+          - dest2
+          - status2
+          - wait2
+          - carriages2
+          - dest3
+          - status3
+          - wait3
+          - carriages3
+
+# Template sensors to extract individual tram information
+template:
+  - sensor:
+      # Next outgoing tram
+      - name: "Next Outgoing Tram"
+        state: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'dest0') }}"
+        attributes:
+          wait_time: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') }}"
+          status: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'status0') }}"
+          carriages: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'carriages0') }}"
+        icon: "mdi:train"
+
+      # Second outgoing tram
+      - name: "Second Outgoing Tram"
+        state: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'dest1') }}"
+        attributes:
+          wait_time: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait1') }}"
+          status: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'status1') }}"
+          carriages: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'carriages1') }}"
+        icon: "mdi:train"
+
+      # Next incoming tram
+      - name: "Next Incoming Tram"
+        state: "{{ state_attr('sensor.metrolink_altrincham_incoming', 'dest0') }}"
+        attributes:
+          wait_time: "{{ state_attr('sensor.metrolink_altrincham_incoming', 'wait0') }}"
+          status: "{{ state_attr('sensor.metrolink_altrincham_incoming', 'status0') }}"
+          carriages: "{{ state_attr('sensor.metrolink_altrincham_incoming', 'carriages0') }}"
+        icon: "mdi:train"
+
+      # Service message sensor
+      - name: "Metrolink Service Message"
+        state: >
+          {% set msg = state_attr('sensor.metrolink_altrincham_outgoing', 'message') %}
+          {% if msg %}
+            Active
+          {% else %}
+            Normal Service
+          {% endif %}
+        attributes:
+          message: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'message') }}"
+          station: "Altrincham"
+        icon: >
+          {% set msg = state_attr('sensor.metrolink_altrincham_outgoing', 'message') %}
+          {% if msg %}
+            mdi:alert-circle
+          {% else %}
+            mdi:information
+          {% endif %}
+
+# Example automations
+automation:
+  - alias: "Tram Due Notification"
+    trigger:
+      - platform: template
+        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int <= 2 }}"
+    condition:
+      - condition: template
+        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int > 0 }}"
+    action:
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "Tram Due Soon!"
+          message: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'dest0') }} tram arriving in {{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') }} minutes"
+
+  - alias: "Service Disruption Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.metrolink_service_message
+        to: "Active"
+    action:
+      - service: notify.mobile_app_your_phone
+        data:
+          title: "Metrolink Service Alert"
+          message: "{{ state_attr('sensor.metrolink_service_message', 'message') }}"
+      - service: persistent_notification.create
+        data:
+          title: "Metrolink Service Disruption"
+          message: "{{ state_attr('sensor.metrolink_service_message', 'message') }}"
+          notification_id: "metrolink_service_alert"
+
+# Example Lovelace card configuration
+# Add this to your dashboard:
+# type: entities
+# title: Altrincham Metrolink
+# entities:
+#   - entity: sensor.metrolink_service_message
+#     name: "Service Status"
+#   - type: divider
+#   - entity: sensor.metrolink_altrincham_outgoing
+#     name: "Outgoing Trams"
+#   - entity: sensor.next_outgoing_tram
+#     name: "Next: "
+#     secondary_info: "{{ state_attr('sensor.next_outgoing_tram', 'wait_time') }} min - {{ state_attr('sensor.next_outgoing_tram', 'status') }}"
+#   - entity: sensor.second_outgoing_tram
+#     name: "Then: "
+#     secondary_info: "{{ state_attr('sensor.second_outgoing_tram', 'wait_time') }} min - {{ state_attr('sensor.second_outgoing_tram', 'status') }}"
+#   - type: divider
+#   - entity: sensor.metrolink_altrincham_incoming
+#     name: "Incoming Trams"
+#   - entity: sensor.next_incoming_tram
+#     name: "Next: "
+#     secondary_info: "{{ state_attr('sensor.next_incoming_tram', 'wait_time') }} min - {{ state_attr('sensor.next_incoming_tram', 'status') }}"
+
+# Alternative card showing service message prominently:
+# type: vertical-stack
+# cards:
+#   - type: conditional
+#     conditions:
+#       - entity: sensor.metrolink_service_message
+#         state: "Active"
+#     card:
+#       type: markdown
+#       content: |
+#         ## ⚠️ Service Alert
+#         {{ state_attr('sensor.metrolink_service_message', 'message') }}
+#   - type: entities
+#     title: Altrincham Metrolink
+#     entities:
+#       - entity: sensor.next_outgoing_tram
+#         name: "Next Outgoing"
+#       - entity: sensor.next_incoming_tram
+#         name: "Next Incoming"
