@@ -389,8 +389,7 @@ async def debug_info(meta: bool = Query(False, description="Include station meta
     if not should_use_polling_mode():
         # Debug endpoint is not available in Lambda mode
         raise HTTPException(
-            status_code=404,
-            detail="Debug endpoint is only available in polling mode"
+            status_code=404, detail="Debug endpoint is only available in polling mode"
         )
 
     await ensure_fresh_data()
