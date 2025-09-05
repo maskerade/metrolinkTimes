@@ -68,7 +68,7 @@ TramGraph = None
 # Try to import TramGraph - only available when not in Lambda mode
 try:
     from metrolinkTimes.tramGraph import TramGraph
-    
+
     class GraphUpdater:
         def __init__(self, graph):  # Removed type annotation to avoid NameError
             self.api = TFGMMetrolinksAPI()
@@ -162,7 +162,9 @@ try:
                                 }
                             )
 
-                    self.graph.updatePlatformPID(nodeID, pidTramData, message, updateTime)
+                    self.graph.updatePlatformPID(
+                        nodeID, pidTramData, message, updateTime
+                    )
 
             self.graph.decodePIDs()
             self.graph.clearOldDeparted()
@@ -352,7 +354,7 @@ async def ensure_fresh_data():
 
     # Polling mode: use graph-based approach
     tram_graph, updater = get_graph()
-    
+
     # Check if data is fresh
     now = datetime.now()
     lastUpdated = tram_graph.getLocalUpdateTime()
@@ -431,14 +433,19 @@ async def list_stations():
             api = TFGMMetrolinksAPI()
             data = api.getData()
             if data is None:
-                raise HTTPException(status_code=503, detail="TfGM API returned no data - check API key configuration")
-            
+                raise HTTPException(
+                    status_code=503,
+                    detail="TfGM API returned no data - check API key configuration",
+                )
+
             stations = [f"{station}/" for station in sorted(data.keys())]
             return StationList(stations=stations)
         except Exception as e:
             logging.error(f"Error fetching data from TfGM API: {e}")
-            raise HTTPException(status_code=503, detail=f"Unable to fetch data from TfGM API: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch data from TfGM API: {str(e)}"
+            )
+
     # Polling mode: use graph-based approach
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
@@ -451,7 +458,9 @@ async def get_station_info(
     station_name: str,
     request: Request,
     include_predictions: bool = Query(True, description="Include tram predictions"),
-    include_departed: bool = Query(False, description="Include recently departed trams"),
+    include_departed: bool = Query(
+        False, description="Include recently departed trams"
+    ),
 ):
     """Get information about a specific station"""
     if not should_use_polling_mode():
@@ -461,10 +470,10 @@ async def get_station_info(
             data = api.getData()
             if data is None:
                 raise HTTPException(status_code=503, detail="TfGM API returned no data")
-            
+
             if station_name not in data:
                 raise HTTPException(status_code=404, detail="Station not found")
-            
+
             ret = {
                 "station": station_name,
                 "platforms": {},
@@ -477,44 +486,57 @@ async def get_station_info(
                     ],
                 },
             }
-            
+
             for platform_id, platform_data_list in data[station_name].items():
                 if platform_data_list:
-                    platform_info = platform_data_list[0]  # Get first (and usually only) entry
-                    
+                    platform_info = platform_data_list[
+                        0
+                    ]  # Get first (and usually only) entry
+
                     platform_data = {
                         "platform": platform_id,
-                        "message": platform_info.get("MessageBoard", "").replace("^$", "") if platform_info.get("MessageBoard") not in ["^F0", "<no message>"] else None,
+                        "message": platform_info.get("MessageBoard", "").replace(
+                            "^$", ""
+                        )
+                        if platform_info.get("MessageBoard")
+                        not in ["^F0", "<no message>"]
+                        else None,
                         "last_updated": platform_info.get("LastUpdated"),
                         "_links": {"self": f"/station/{station_name}/{platform_id}/"},
                     }
-                    
+
                     if include_predictions:
                         # Extract tram predictions from TfGM data
                         trams = []
                         for i in range(4):  # TfGM API provides up to 4 tram predictions
                             dest = platform_info.get(f"Dest{i}", "")
                             if dest:
-                                trams.append({
-                                    "destination": dest,
-                                    "carriages": platform_info.get(f"Carriages{i}", ""),
-                                    "status": platform_info.get(f"Status{i}", ""),
-                                    "wait": platform_info.get(f"Wait{i}", "")
-                                })
+                                trams.append(
+                                    {
+                                        "destination": dest,
+                                        "carriages": platform_info.get(
+                                            f"Carriages{i}", ""
+                                        ),
+                                        "status": platform_info.get(f"Status{i}", ""),
+                                        "wait": platform_info.get(f"Wait{i}", ""),
+                                    }
+                                )
                         platform_data["trams"] = trams
-                    
+
                     # Note: departed trams not available in direct TfGM API mode
                     if include_departed:
                         platform_data["departed"] = []
-                    
+
                     ret["platforms"][platform_id] = platform_data
-            
+
             return ret
-            
+
         except Exception as e:
             logging.error(f"Error fetching station data from TfGM API: {e}")
-            raise HTTPException(status_code=503, detail=f"Unable to fetch station data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch station data: {str(e)}"
+            )
+
     # Polling mode: use graph-based approach
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
@@ -578,29 +600,35 @@ async def get_platform_info(
             data = api.getData()
             if data is None:
                 raise HTTPException(status_code=503, detail="TfGM API returned no data")
-            
+
             if station_name not in data:
                 raise HTTPException(status_code=404, detail="Station not found")
-            
+
             if platform_id not in data[station_name]:
                 raise HTTPException(status_code=404, detail="Platform not found")
-            
+
             platform_data_list = data[station_name][platform_id]
             if not platform_data_list:
-                raise HTTPException(status_code=404, detail="No data available for this platform")
-            
+                raise HTTPException(
+                    status_code=404, detail="No data available for this platform"
+                )
+
             platform_info = platform_data_list[0]  # Get first (and usually only) entry
-            
+
             ret = {
                 "platform": platform_id,
                 "station": station_name,
                 "last_updated": platform_info.get("LastUpdated"),
                 "_links": {"self": str(request.url)},
             }
-            
+
             if message:
-                ret["message"] = platform_info.get("MessageBoard", "").replace("^$", "") if platform_info.get("MessageBoard") not in ["^F0", "<no message>"] else None
-            
+                ret["message"] = (
+                    platform_info.get("MessageBoard", "").replace("^$", "")
+                    if platform_info.get("MessageBoard") not in ["^F0", "<no message>"]
+                    else None
+                )
+
             if predictions:
                 # Extract tram predictions from TfGM data
                 trams = []
@@ -611,34 +639,36 @@ async def get_platform_info(
                             "destination": dest,
                             "carriages": platform_info.get(f"Carriages{i}", ""),
                             "status": platform_info.get(f"Status{i}", ""),
-                            "wait": platform_info.get(f"Wait{i}", "")
+                            "wait": platform_info.get(f"Wait{i}", ""),
                         }
                         if tram_predictions:
                             # Add additional prediction details if requested
                             tram_data["predictions"] = {
                                 "wait_time": platform_info.get(f"Wait{i}", ""),
-                                "status": platform_info.get(f"Status{i}", "")
+                                "status": platform_info.get(f"Status{i}", ""),
                             }
                         trams.append(tram_data)
                 ret["predictions"] = trams
                 ret["here"] = []  # Not available in direct API mode
-            
+
             if departed:
                 ret["departed"] = []  # Not available in direct API mode
-            
+
             if meta:
                 # Limited metadata in Lambda mode
                 ret["meta"] = {
                     "note": "Limited metadata available in Lambda mode",
-                    "atco_code": platform_id
+                    "atco_code": platform_id,
                 }
-            
+
             return ret
-            
+
         except Exception as e:
             logging.error(f"Error fetching platform data from TfGM API: {e}")
-            raise HTTPException(status_code=503, detail=f"Unable to fetch platform data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch platform data: {str(e)}"
+            )
+
     # Polling mode: use graph-based approach
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
@@ -703,9 +733,9 @@ async def homeassistant_root():
             "/homeassistant/stations/",
             "/homeassistant/station/{station_name}/",
             "/homeassistant/station/{station_name}/outgoing/",
-            "/homeassistant/station/{station_name}/incoming/"
+            "/homeassistant/station/{station_name}/incoming/",
         ],
-        "description": "Endpoints formatted for Home Assistant REST sensors"
+        "description": "Endpoints formatted for Home Assistant REST sensors",
     }
 
 
@@ -719,32 +749,34 @@ async def homeassistant_stations():
             data = api.getData()
             if data is None:
                 raise HTTPException(status_code=503, detail="TfGM API returned no data")
-            
+
             return {
                 "state": len(data.keys()),
                 "attributes": {
                     "stations": sorted(data.keys()),
                     "unit_of_measurement": "stations",
                     "friendly_name": "Metrolink Stations",
-                    "icon": "mdi:train"
-                }
+                    "icon": "mdi:train",
+                },
             }
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Unable to fetch data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch data: {str(e)}"
+            )
+
     # Polling mode
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
     stations = list(tram_graph.getStations())
-    
+
     return {
         "state": len(stations),
         "attributes": {
             "stations": sorted(stations),
             "unit_of_measurement": "stations",
             "friendly_name": "Metrolink Stations",
-            "icon": "mdi:train"
-        }
+            "icon": "mdi:train",
+        },
     }
 
 
@@ -758,37 +790,44 @@ async def homeassistant_station_summary(station_name: str):
             data = api.getData()
             if data is None or station_name not in data:
                 raise HTTPException(status_code=404, detail="Station not found")
-            
+
             # Count total trams across all platforms
             total_trams = 0
             platforms = {}
             last_updated = None
-            
+
             for platform_id, platform_data_list in data[station_name].items():
                 if platform_data_list:
                     platform_info = platform_data_list[0]
                     platform_trams = []
-                    
+
                     for i in range(4):
                         dest = platform_info.get(f"Dest{i}", "")
                         if dest:
-                            platform_trams.append({
-                                "destination": dest,
-                                "wait": platform_info.get(f"Wait{i}", ""),
-                                "status": platform_info.get(f"Status{i}", ""),
-                                "carriages": platform_info.get(f"Carriages{i}", "")
-                            })
+                            platform_trams.append(
+                                {
+                                    "destination": dest,
+                                    "wait": platform_info.get(f"Wait{i}", ""),
+                                    "status": platform_info.get(f"Status{i}", ""),
+                                    "carriages": platform_info.get(f"Carriages{i}", ""),
+                                }
+                            )
                             total_trams += 1
-                    
+
                     platforms[platform_id] = {
                         "direction": platform_info.get("Direction", ""),
                         "trams": platform_trams,
-                        "message": platform_info.get("MessageBoard", "").replace("^$", "") if platform_info.get("MessageBoard") not in ["^F0", "<no message>"] else None
+                        "message": platform_info.get("MessageBoard", "").replace(
+                            "^$", ""
+                        )
+                        if platform_info.get("MessageBoard")
+                        not in ["^F0", "<no message>"]
+                        else None,
                     }
-                    
+
                     if not last_updated:
                         last_updated = platform_info.get("LastUpdated")
-            
+
             return {
                 "state": total_trams,
                 "attributes": {
@@ -797,27 +836,29 @@ async def homeassistant_station_summary(station_name: str):
                     "last_updated": last_updated,
                     "unit_of_measurement": "trams",
                     "friendly_name": f"Metrolink {station_name}",
-                    "icon": "mdi:train"
-                }
+                    "icon": "mdi:train",
+                },
             }
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Unable to fetch data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch data: {str(e)}"
+            )
+
     # Polling mode
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
-    
+
     if station_name not in tram_graph.getStations():
         raise HTTPException(status_code=404, detail="Station not found")
-    
+
     platforms = {}
     total_trams = 0
-    
+
     for platID in tram_graph.getStationPlatforms(station_name):
         nodeID = f"{station_name}_{platID}"
         trams = tram_graph.getTramsStarting()[nodeID]
         total_trams += len(trams)
-        
+
         platforms[platID] = {
             "trams": trams,
             "message": tram_graph.getMessage(nodeID),
@@ -825,9 +866,9 @@ async def homeassistant_station_summary(station_name: str):
                 tram_graph.getLastUpdateTime(nodeID).isoformat()
                 if tram_graph.getLastUpdateTime(nodeID)
                 else None
-            )
+            ),
         }
-    
+
     return {
         "state": total_trams,
         "attributes": {
@@ -836,8 +877,8 @@ async def homeassistant_station_summary(station_name: str):
             "last_updated": tram_graph.getLocalUpdateTime().isoformat(),
             "unit_of_measurement": "trams",
             "friendly_name": f"Metrolink {station_name}",
-            "icon": "mdi:train"
-        }
+            "icon": "mdi:train",
+        },
     }
 
 
@@ -851,33 +892,44 @@ async def homeassistant_station_outgoing(station_name: str):
             data = api.getData()
             if data is None or station_name not in data:
                 raise HTTPException(status_code=404, detail="Station not found")
-            
+
             outgoing_trams = []
             last_updated = None
             message = None
-            
-            for platform_id, platform_data_list in data[station_name].items():
+
+            for _platform_id, platform_data_list in data[station_name].items():
                 if platform_data_list:
                     platform_info = platform_data_list[0]
-                    
+
                     # Check if this is an outgoing platform
                     if platform_info.get("Direction", "").lower() == "outgoing":
                         for i in range(4):
                             dest = platform_info.get(f"Dest{i}", "")
                             if dest:
-                                outgoing_trams.append({
-                                    f"dest{i}": dest,
-                                    f"status{i}": platform_info.get(f"Status{i}", ""),
-                                    f"wait{i}": platform_info.get(f"Wait{i}", ""),
-                                    f"carriages{i}": platform_info.get(f"Carriages{i}", "")
-                                })
-                        
+                                outgoing_trams.append(
+                                    {
+                                        f"dest{i}": dest,
+                                        f"status{i}": platform_info.get(
+                                            f"Status{i}", ""
+                                        ),
+                                        f"wait{i}": platform_info.get(f"Wait{i}", ""),
+                                        f"carriages{i}": platform_info.get(
+                                            f"Carriages{i}", ""
+                                        ),
+                                    }
+                                )
+
                         if not last_updated:
                             last_updated = platform_info.get("LastUpdated")
-                        
-                        if not message and platform_info.get("MessageBoard") not in ["^F0", "<no message>"]:
-                            message = platform_info.get("MessageBoard", "").replace("^$", "")
-            
+
+                        if not message and platform_info.get("MessageBoard") not in [
+                            "^F0",
+                            "<no message>",
+                        ]:
+                            message = platform_info.get("MessageBoard", "").replace(
+                                "^$", ""
+                            )
+
             # Flatten the tram data for Home Assistant attributes
             attributes = {
                 "station_name": station_name,
@@ -885,29 +937,28 @@ async def homeassistant_station_outgoing(station_name: str):
                 "last_updated": last_updated,
                 "message": message,
                 "friendly_name": f"Metrolink {station_name} Outgoing",
-                "icon": "mdi:train-variant"
+                "icon": "mdi:train-variant",
             }
-            
+
             # Add flattened tram data
-            for i, tram in enumerate(outgoing_trams[:4]):  # Limit to 4 trams
+            for _i, tram in enumerate(outgoing_trams[:4]):  # Limit to 4 trams
                 for key, value in tram.items():
                     attributes[key] = value
-            
-            return {
-                "state": len(outgoing_trams),
-                "attributes": attributes
-            }
+
+            return {"state": len(outgoing_trams), "attributes": attributes}
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Unable to fetch data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch data: {str(e)}"
+            )
+
     # Polling mode - this would need platform direction mapping
     # For now, return all platforms (you'd need to add direction info to your graph)
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
-    
+
     if station_name not in tram_graph.getStations():
         raise HTTPException(status_code=404, detail="Station not found")
-    
+
     # In polling mode, we don't have direction info readily available
     # This is a limitation of the current graph structure
     all_trams = []
@@ -915,27 +966,24 @@ async def homeassistant_station_outgoing(station_name: str):
         nodeID = f"{station_name}_{platID}"
         trams = tram_graph.getTramsStarting()[nodeID]
         all_trams.extend(trams)
-    
+
     # Format for Home Assistant
     attributes = {
         "station_name": station_name,
         "direction": "outgoing",
         "last_updated": tram_graph.getLocalUpdateTime().isoformat(),
         "friendly_name": f"Metrolink {station_name} Outgoing",
-        "icon": "mdi:train-variant"
+        "icon": "mdi:train-variant",
     }
-    
+
     # Add first 4 trams as individual attributes
     for i, tram in enumerate(all_trams[:4]):
         attributes[f"dest{i}"] = tram.get("dest", "")
         attributes[f"status{i}"] = tram.get("status", "")
         attributes[f"wait{i}"] = tram.get("wait", "")
         attributes[f"carriages{i}"] = tram.get("carriages", "")
-    
-    return {
-        "state": len(all_trams),
-        "attributes": attributes
-    }
+
+    return {"state": len(all_trams), "attributes": attributes}
 
 
 @app.get("/homeassistant/station/{station_name}/incoming/")
@@ -948,33 +996,44 @@ async def homeassistant_station_incoming(station_name: str):
             data = api.getData()
             if data is None or station_name not in data:
                 raise HTTPException(status_code=404, detail="Station not found")
-            
+
             incoming_trams = []
             last_updated = None
             message = None
-            
-            for platform_id, platform_data_list in data[station_name].items():
+
+            for _platform_id, platform_data_list in data[station_name].items():
                 if platform_data_list:
                     platform_info = platform_data_list[0]
-                    
+
                     # Check if this is an incoming platform
                     if platform_info.get("Direction", "").lower() == "incoming":
                         for i in range(4):
                             dest = platform_info.get(f"Dest{i}", "")
                             if dest:
-                                incoming_trams.append({
-                                    f"dest{i}": dest,
-                                    f"status{i}": platform_info.get(f"Status{i}", ""),
-                                    f"wait{i}": platform_info.get(f"Wait{i}", ""),
-                                    f"carriages{i}": platform_info.get(f"Carriages{i}", "")
-                                })
-                        
+                                incoming_trams.append(
+                                    {
+                                        f"dest{i}": dest,
+                                        f"status{i}": platform_info.get(
+                                            f"Status{i}", ""
+                                        ),
+                                        f"wait{i}": platform_info.get(f"Wait{i}", ""),
+                                        f"carriages{i}": platform_info.get(
+                                            f"Carriages{i}", ""
+                                        ),
+                                    }
+                                )
+
                         if not last_updated:
                             last_updated = platform_info.get("LastUpdated")
-                        
-                        if not message and platform_info.get("MessageBoard") not in ["^F0", "<no message>"]:
-                            message = platform_info.get("MessageBoard", "").replace("^$", "")
-            
+
+                        if not message and platform_info.get("MessageBoard") not in [
+                            "^F0",
+                            "<no message>",
+                        ]:
+                            message = platform_info.get("MessageBoard", "").replace(
+                                "^$", ""
+                            )
+
             # Flatten the tram data for Home Assistant attributes
             attributes = {
                 "station_name": station_name,
@@ -982,52 +1041,48 @@ async def homeassistant_station_incoming(station_name: str):
                 "last_updated": last_updated,
                 "message": message,
                 "friendly_name": f"Metrolink {station_name} Incoming",
-                "icon": "mdi:train-variant"
+                "icon": "mdi:train-variant",
             }
-            
+
             # Add flattened tram data
-            for i, tram in enumerate(incoming_trams[:4]):  # Limit to 4 trams
+            for _i, tram in enumerate(incoming_trams[:4]):  # Limit to 4 trams
                 for key, value in tram.items():
                     attributes[key] = value
-            
-            return {
-                "state": len(incoming_trams),
-                "attributes": attributes
-            }
+
+            return {"state": len(incoming_trams), "attributes": attributes}
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Unable to fetch data: {str(e)}")
-    
+            raise HTTPException(
+                status_code=503, detail=f"Unable to fetch data: {str(e)}"
+            )
+
     # Polling mode - similar limitation as outgoing
     await ensure_fresh_data()
     tram_graph, _ = get_graph()
-    
+
     if station_name not in tram_graph.getStations():
         raise HTTPException(status_code=404, detail="Station not found")
-    
+
     # In polling mode, we don't have direction info readily available
     all_trams = []
     for platID in tram_graph.getStationPlatforms(station_name):
         nodeID = f"{station_name}_{platID}"
         trams = tram_graph.getTramsStarting()[nodeID]
         all_trams.extend(trams)
-    
+
     # Format for Home Assistant
     attributes = {
         "station_name": station_name,
-        "direction": "incoming", 
+        "direction": "incoming",
         "last_updated": tram_graph.getLocalUpdateTime().isoformat(),
         "friendly_name": f"Metrolink {station_name} Incoming",
-        "icon": "mdi:train-variant"
+        "icon": "mdi:train-variant",
     }
-    
+
     # Add first 4 trams as individual attributes
     for i, tram in enumerate(all_trams[:4]):
         attributes[f"dest{i}"] = tram.get("dest", "")
         attributes[f"status{i}"] = tram.get("status", "")
         attributes[f"wait{i}"] = tram.get("wait", "")
         attributes[f"carriages{i}"] = tram.get("carriages", "")
-    
-    return {
-        "state": len(all_trams),
-        "attributes": attributes
-    }
+
+    return {"state": len(all_trams), "attributes": attributes}
