@@ -900,8 +900,14 @@ async def homeassistant_station_outgoing(station_name: str):
         try:
             api = TFGMMetrolinksAPI()
             data = api.getData()
-            if data is None or station_name not in data:
-                raise HTTPException(status_code=404, detail="Station not found")
+            if data is None:
+                raise HTTPException(status_code=503, detail="TfGM API returned no data")
+            if station_name not in data:
+                available_stations = list(data.keys())[:5] if data else []
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Station '{station_name}' not found. Available: {available_stations}",
+                )
 
             outgoing_trams = []
             last_updated = None
@@ -911,34 +917,32 @@ async def homeassistant_station_outgoing(station_name: str):
                 if platform_data_list:
                     platform_info = platform_data_list[0]
 
-                    # Check if this is an outgoing platform
-                    if platform_info.get("Direction", "").lower() == "outgoing":
-                        for i in range(4):
-                            dest = platform_info.get(f"Dest{i}", "")
-                            if dest:
-                                outgoing_trams.append(
-                                    {
-                                        f"dest{i}": dest,
-                                        f"status{i}": platform_info.get(
-                                            f"Status{i}", ""
-                                        ),
-                                        f"wait{i}": platform_info.get(f"Wait{i}", ""),
-                                        f"carriages{i}": platform_info.get(
-                                            f"Carriages{i}", ""
-                                        ),
-                                    }
-                                )
-
-                        if not last_updated:
-                            last_updated = platform_info.get("LastUpdated")
-
-                        if not message and platform_info.get("MessageBoard") not in [
-                            "^F0",
-                            "<no message>",
-                        ]:
-                            message = platform_info.get("MessageBoard", "").replace(
-                                "^$", ""
+                    # For outgoing, we'll take all platforms since TfGM doesn't always provide explicit direction
+                    # In most cases, stations have separate platforms for different directions
+                    for i in range(4):
+                        dest = platform_info.get(f"Dest{i}", "")
+                        if dest:
+                            outgoing_trams.append(
+                                {
+                                    "dest": dest,
+                                    "status": platform_info.get(f"Status{i}", ""),
+                                    "wait": platform_info.get(f"Wait{i}", ""),
+                                    "carriages": platform_info.get(f"Carriages{i}", ""),
+                                }
                             )
+
+                    if not last_updated:
+                        last_updated = platform_info.get("LastUpdated")
+
+                    # Check for message in both raw API format and processed format
+                    if not message:
+                        msg_board = platform_info.get("MessageBoard", "")
+                        msg_direct = platform_info.get("message", "")
+
+                        if msg_board and msg_board not in ["^F0", "<no message>"]:
+                            message = msg_board.replace("^$", "")
+                        elif msg_direct:
+                            message = msg_direct
 
             # Flatten the tram data for Home Assistant attributes
             attributes = {
@@ -950,10 +954,12 @@ async def homeassistant_station_outgoing(station_name: str):
                 "icon": "mdi:train-variant",
             }
 
-            # Add flattened tram data
-            for _i, tram in enumerate(outgoing_trams[:4]):  # Limit to 4 trams
-                for key, value in tram.items():
-                    attributes[key] = value
+            # Add flattened tram data with proper indexing
+            for i, tram in enumerate(outgoing_trams[:4]):  # Limit to 4 trams
+                attributes[f"dest{i}"] = tram.get("dest", "")
+                attributes[f"status{i}"] = tram.get("status", "")
+                attributes[f"wait{i}"] = tram.get("wait", "")
+                attributes[f"carriages{i}"] = tram.get("carriages", "")
 
             return {"state": len(outgoing_trams), "attributes": attributes}
         except Exception as e:
@@ -972,16 +978,25 @@ async def homeassistant_station_outgoing(station_name: str):
     # In polling mode, we don't have direction info readily available
     # This is a limitation of the current graph structure
     all_trams = []
+    message = None
+
     for platID in tram_graph.getStationPlatforms(station_name):
         nodeID = f"{station_name}_{platID}"
         trams = tram_graph.getTramsStarting()[nodeID]
         all_trams.extend(trams)
+
+        # Extract message from any platform that has one
+        if not message:
+            platform_message = tram_graph.getMessage(nodeID)
+            if platform_message:
+                message = platform_message
 
     # Format for Home Assistant
     attributes = {
         "station_name": station_name,
         "direction": "outgoing",
         "last_updated": tram_graph.getLocalUpdateTime().isoformat(),
+        "message": message,
         "friendly_name": f"Metrolink {station_name} Outgoing",
         "icon": "mdi:train-variant",
     }
@@ -1015,34 +1030,32 @@ async def homeassistant_station_incoming(station_name: str):
                 if platform_data_list:
                     platform_info = platform_data_list[0]
 
-                    # Check if this is an incoming platform
-                    if platform_info.get("Direction", "").lower() == "incoming":
-                        for i in range(4):
-                            dest = platform_info.get(f"Dest{i}", "")
-                            if dest:
-                                incoming_trams.append(
-                                    {
-                                        f"dest{i}": dest,
-                                        f"status{i}": platform_info.get(
-                                            f"Status{i}", ""
-                                        ),
-                                        f"wait{i}": platform_info.get(f"Wait{i}", ""),
-                                        f"carriages{i}": platform_info.get(
-                                            f"Carriages{i}", ""
-                                        ),
-                                    }
-                                )
-
-                        if not last_updated:
-                            last_updated = platform_info.get("LastUpdated")
-
-                        if not message and platform_info.get("MessageBoard") not in [
-                            "^F0",
-                            "<no message>",
-                        ]:
-                            message = platform_info.get("MessageBoard", "").replace(
-                                "^$", ""
+                    # For incoming, we'll take all platforms since TfGM doesn't always provide explicit direction
+                    # In most cases, stations have separate platforms for different directions
+                    for i in range(4):
+                        dest = platform_info.get(f"Dest{i}", "")
+                        if dest:
+                            incoming_trams.append(
+                                {
+                                    "dest": dest,
+                                    "status": platform_info.get(f"Status{i}", ""),
+                                    "wait": platform_info.get(f"Wait{i}", ""),
+                                    "carriages": platform_info.get(f"Carriages{i}", ""),
+                                }
                             )
+
+                    if not last_updated:
+                        last_updated = platform_info.get("LastUpdated")
+
+                    # Check for message in both raw API format and processed format
+                    if not message:
+                        msg_board = platform_info.get("MessageBoard", "")
+                        msg_direct = platform_info.get("message", "")
+
+                        if msg_board and msg_board not in ["^F0", "<no message>"]:
+                            message = msg_board.replace("^$", "")
+                        elif msg_direct:
+                            message = msg_direct
 
             # Flatten the tram data for Home Assistant attributes
             attributes = {
@@ -1054,10 +1067,12 @@ async def homeassistant_station_incoming(station_name: str):
                 "icon": "mdi:train-variant",
             }
 
-            # Add flattened tram data
-            for _i, tram in enumerate(incoming_trams[:4]):  # Limit to 4 trams
-                for key, value in tram.items():
-                    attributes[key] = value
+            # Add flattened tram data with proper indexing
+            for i, tram in enumerate(incoming_trams[:4]):  # Limit to 4 trams
+                attributes[f"dest{i}"] = tram.get("dest", "")
+                attributes[f"status{i}"] = tram.get("status", "")
+                attributes[f"wait{i}"] = tram.get("wait", "")
+                attributes[f"carriages{i}"] = tram.get("carriages", "")
 
             return {"state": len(incoming_trams), "attributes": attributes}
         except Exception as e:
@@ -1074,16 +1089,25 @@ async def homeassistant_station_incoming(station_name: str):
 
     # In polling mode, we don't have direction info readily available
     all_trams = []
+    message = None
+
     for platID in tram_graph.getStationPlatforms(station_name):
         nodeID = f"{station_name}_{platID}"
         trams = tram_graph.getTramsStarting()[nodeID]
         all_trams.extend(trams)
+
+        # Extract message from any platform that has one
+        if not message:
+            platform_message = tram_graph.getMessage(nodeID)
+            if platform_message:
+                message = platform_message
 
     # Format for Home Assistant
     attributes = {
         "station_name": station_name,
         "direction": "incoming",
         "last_updated": tram_graph.getLocalUpdateTime().isoformat(),
+        "message": message,
         "friendly_name": f"Metrolink {station_name} Incoming",
         "icon": "mdi:train-variant",
     }

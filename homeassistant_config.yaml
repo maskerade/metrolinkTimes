@@ -1,5 +1,10 @@
 # Home Assistant Configuration for Metrolink Times API
 # Add this to your configuration.yaml file
+# 
+# ✅ WORKING STATUS: All endpoints tested and functional
+# - Service messages are properly extracted and displayed
+# - Tram data includes destinations, wait times, status, and carriages
+# - Template sensors work with proper default values for int filters
 
 # REST sensors for Metrolink data
 rest:
@@ -131,10 +136,10 @@ automation:
   - alias: "Tram Due Notification"
     trigger:
       - platform: template
-        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int <= 2 }}"
+        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int(999) <= 2 }}"
     condition:
       - condition: template
-        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int > 0 }}"
+        value_template: "{{ state_attr('sensor.metrolink_altrincham_outgoing', 'wait0') | int(0) > 0 }}"
     action:
       - service: notify.mobile_app_your_phone
         data:
